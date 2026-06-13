@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from backend.annotator import annotate
 from backend.assemble import build_report
+from backend.explain import generate_explanation
 from backend.router import run_pipelines
 
 # Loaded-once model registry (PLAN §4.2): perception weights live here for the app's
@@ -187,6 +188,10 @@ async def analyze(request: Request):
         annotated_image = await run_in_threadpool(annotate, image_bytes, signals)
 
     report = build_report(signals, models_run, annotated_image)
+    # Phase 7 (PLAN §4.11): optional local-LLM explanation — additive + NON-BLOCKING.
+    # Offloaded so the sync HTTP call to Ollama can't block the event loop; returns
+    # None fast if Ollama is down/absent, so the report always ships either way.
+    report.explanation = await run_in_threadpool(generate_explanation, report)
     # image_bytes goes out of scope here — nothing is persisted (meta.stored=False).
     # mode="json" + the Evidence.raw validator guarantee a serializable payload
     # no matter what an extractor stuffs into evidence.raw.
