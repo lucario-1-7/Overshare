@@ -169,6 +169,56 @@ def check_presence(username: str) -> List[FootprintSignal]:
     return out
 
 
+_CANNED_GITHUB = {
+    "torvalds": {"name": "Linus Torvalds", "location": "Portland, OR", "company": None,
+                 "bio": "Creator of Linux & Git", "public_repos": 8, "followers": 230000},
+    "demo": {"name": "Demo User", "location": "Bengaluru", "company": "@acme",
+             "bio": "building things", "public_repos": 24, "followers": 120},
+}
+
+
+# --- GitHub profile enrichment: real public API (no key needed) ------------------
+def enrich_github(username: str) -> List[FootprintSignal]:
+    """Fetch a real public GitHub profile (bio/location/company/repos). The one safe,
+    stable external profile source. Returns [] on any error; canned for demo handles."""
+    if not username or not username.strip():
+        return []
+    handle = username.strip().lstrip("@")
+    if not (1 <= len(handle) <= 39 and all(c.isalnum() or c in "-_" for c in handle)):
+        return []
+
+    data = None
+    if _canned_on() or handle.lower() in _CANNED_GITHUB:
+        data = _CANNED_GITHUB.get(handle.lower(), _CANNED_GITHUB["demo"])
+    else:
+        requests = _requests()
+        if requests is None:
+            return []
+        try:
+            r = requests.get(f"https://api.github.com/users/{handle}",
+                             headers={**_UA, "Accept": "application/vnd.github+json"}, timeout=_TIMEOUT)
+            if r.status_code == 200:
+                data = r.json()
+        except Exception:
+            return []
+    if not data:
+        return []
+
+    out: List[FootprintSignal] = []
+    base = {"site": "github", "handle": handle}
+    out.append(FootprintSignal(
+        type="github_profile", source="github",
+        value=f"{data.get('public_repos', 0)} repos, {data.get('followers', 0)} followers",
+        detail={**base, "name": data.get("name"), "bio": data.get("bio")},
+    ))
+    if data.get("location"):
+        out.append(FootprintSignal(type="location", value=str(data["location"]), source="github", detail=base))
+    if data.get("company"):
+        out.append(FootprintSignal(type="organization", value=str(data["company"]).lstrip("@"),
+                                   source="github", detail=base))
+    return out
+
+
 def collect(email: Optional[str] = None, username: Optional[str] = None) -> List[FootprintSignal]:
     """Run every applicable collector and return the combined footprint signals."""
     signals: List[FootprintSignal] = []
@@ -178,4 +228,5 @@ def collect(email: Optional[str] = None, username: Optional[str] = None) -> List
         signals += check_gravatar(email)
     if username:
         signals += check_presence(username)
+        signals += enrich_github(username)
     return signals
