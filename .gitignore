@@ -23,6 +23,9 @@ test_clean.jpg
 weights/
 .cache/
 
+# Claude Code harness (local tooling, not part of the project)
+.claude/
+
 # OS / editor
 .DS_Store
 Thumbs.db
