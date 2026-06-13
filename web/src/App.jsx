@@ -1,26 +1,16 @@
 import { useEffect, useState } from 'react'
-import { analyze, fetchHealth } from './lib/api.js'
-import { normalizeReport } from './lib/report.js'
-import { SAMPLE_REPORT } from './lib/sampleReport.js'
+import { fetchHealth } from './lib/api.js'
+import ScannerPage from './pages/ScannerPage.jsx'
+import FootprintPage from './pages/FootprintPage.jsx'
 
-import Uploader from './components/Uploader.jsx'
-import MetaBar from './components/MetaBar.jsx'
-import AnnotatedImage from './components/AnnotatedImage.jsx'
-import SignalChips from './components/SignalChips.jsx'
-import ExposureGraph from './components/ExposureGraph.jsx'
-import RiskMeters from './components/RiskMeters.jsx'
-import AttackPath from './components/AttackPath.jsx'
-import Fixes from './components/Fixes.jsx'
-import Explanation from './components/Explanation.jsx'
-import EmptyState from './components/EmptyState.jsx'
+const TABS = [
+  { id: 'scanner', label: 'Image / Text Scanner', icon: '🔎' },
+  { id: 'footprint', label: 'Digital Footprint', icon: '🛰️' },
+]
 
 export default function App() {
-  const [report, setReport] = useState(null) // normalized Report
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [view, setView] = useState('scanner')
   const [health, setHealth] = useState(null)
-  const [uploadedFile, setUploadedFile] = useState(null) // kept for the one-click EXIF strip
-  const [originalUrl, setOriginalUrl] = useState(null)
 
   useEffect(() => {
     fetchHealth()
@@ -28,88 +18,48 @@ export default function App() {
       .catch(() => setHealth(null))
   }, [])
 
-  async function runAnalyze({ file, text, username }) {
-    setLoading(true)
-    setError('')
-    setUploadedFile(file || null)
-    setOriginalUrl(file ? URL.createObjectURL(file) : null)
-    try {
-      const raw = await analyze({ file, text, username })
-      setReport(normalizeReport(raw))
-    } catch (e) {
-      setError(String(e?.message || e))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function loadSample() {
-    setError('')
-    setUploadedFile(null)
-    setOriginalUrl(null)
-    setReport(normalizeReport(SAMPLE_REPORT))
-  }
-
-  function clearAll() {
-    setReport(null)
-    setError('')
-    setUploadedFile(null)
-    setOriginalUrl(null)
-  }
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
-      <Header />
-      <div className="mt-6 grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
-        {/* Left rail */}
-        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <Uploader
-            onAnalyze={runAnalyze}
-            onLoadSample={loadSample}
-            onClear={clearAll}
-            loading={loading}
-            error={error}
-            health={health}
-          />
-          {report && <MetaBar meta={report.meta} />}
-        </div>
-
-        {/* Report */}
-        <div className="space-y-4">
-          {!report ? (
-            <EmptyState onLoadSample={loadSample} />
-          ) : (
-            <>
-              <AnnotatedImage annotatedImage={report.annotatedImage} fallbackUrl={originalUrl} />
-              <SignalChips signals={report.signals} />
-              <ExposureGraph graph={report.graph} />
-              <div className="grid gap-4 md:grid-cols-2">
-                <RiskMeters risks={report.risks} />
-                <AttackPath steps={report.attackPath} />
-              </div>
-              <Fixes fixes={report.fixes} uploadedFile={uploadedFile} />
-              <Explanation text={report.explanation} />
-            </>
-          )}
-        </div>
+      <Header view={view} setView={setView} />
+      <div className="mt-6">
+        {view === 'scanner' ? <ScannerPage health={health} /> : <FootprintPage health={health} />}
       </div>
       <Footer />
     </div>
   )
 }
 
-function Header() {
+function Header({ view, setView }) {
   return (
-    <header className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-bold tracking-[0.18em] text-neon">
-          🛰️ OVERSHARE
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          What a stranger could infer about you — as an exposure graph, risk scores, attack path & fixes.
-        </p>
+    <header className="space-y-4">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-[0.18em] text-neon">🛰️ OVERSHARE</h1>
+          <p className="mt-1 text-sm text-muted">
+            What a stranger could infer about you — across a single post and your whole digital footprint.
+          </p>
+        </div>
+        <span className="chip border-neon/40 text-neon">on-device · nothing leaves this machine</span>
       </div>
-      <span className="chip border-neon/40 text-neon">on-device · nothing leaves this machine</span>
+
+      {/* page nav */}
+      <nav className="flex gap-1 rounded-lg border border-line bg-panel p-1">
+        {TABS.map((t) => {
+          const active = view === t.id
+          return (
+            <button
+              key={t.id}
+              onClick={() => setView(t.id)}
+              className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition ${
+                active ? 'bg-ink text-neon ring-1 ring-neon/40' : 'text-muted hover:text-fg'
+              }`}
+            >
+              <span className="mr-1.5">{t.icon}</span>
+              {t.label}
+            </button>
+          )
+        })}
+      </nav>
     </header>
   )
 }

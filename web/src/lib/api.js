@@ -42,3 +42,28 @@ export async function fetchSampleReport() {
 export async function fetchHealth() {
   return asJson(await fetch('/health'))
 }
+
+// --- Extras: digital-footprint module (opt-in /extras router) -------------------
+
+/** POST an email and/or username → FootprintReport (breach / presence / domain / gravatar). */
+export async function footprint({ email, username }) {
+  return asJson(
+    await fetch('/extras/footprint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email || null, username: username || null }),
+    }),
+  )
+}
+
+/** POST several images (multipart field `files`) → ProfileReport (multi-post Pattern Engine). */
+export async function analyzeProfile(files) {
+  const fd = new FormData()
+  for (const f of files) fd.append('files', f)
+  return asJson(await fetch('/extras/profile', { method: 'POST', body: fd }))
+}
+
+/** GET extras module health (sources + whether keys are required). */
+export async function fetchExtrasHealth() {
+  return asJson(await fetch('/extras/health'))
+}

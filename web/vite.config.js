@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react'
 // behind the Cloudflare tunnel in Phase 6). Override the target with VITE_API_BASE.
 const API = process.env.VITE_API_BASE || 'http://localhost:8077'
 const proxy = Object.fromEntries(
-  ['/analyze', '/health', '/sample-report'].map((p) => [
+  ['/analyze', '/health', '/sample-report', '/extras'].map((p) => [
     p,
     { target: API, changeOrigin: true },
   ]),
