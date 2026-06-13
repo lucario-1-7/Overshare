@@ -14,6 +14,9 @@ env/
 test_gps.jpg
 test_clean.jpg
 
+# Logs (e.g. phase2_install.log from the ML stack install)
+*.log
+
 # Model weights / caches (pulled by scripts/download_weights.py)
 *.pt
 *.onnx

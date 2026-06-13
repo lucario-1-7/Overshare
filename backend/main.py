@@ -1,10 +1,15 @@
 """FastAPI app + the single POST /analyze endpoint (PLAN §4.2).
 
 Design rules baked in from hour 0:
-  - Models load ONCE at startup (the hook is empty in Phase 1), never per-request.
+  - Models load ONCE at startup (lifespan), never per-request, onto the GPU.
   - Uploads are processed in-memory and never written to disk (meta.stored=False).
   - One endpoint accepts multipart (file) OR JSON (text/username); the router
     decides which pipelines fire.
+
+Phase 2 also lands the two hardening items deferred from Phase 1 now that heavy
+models run per request: an upload-size cap (reject huge bodies with 413 before
+reading → no OOM) and a threadpool offload (GPU/CPU inference must not block the
+async event loop).
 """
 from __future__ import annotations
 
@@ -12,27 +17,55 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
+from backend.annotator import annotate
 from backend.assemble import build_report
 from backend.router import run_pipelines
 
-# Loaded-once model registry. Empty in Phase 1; populated in the lifespan below
-# in later phases (YOLO / RetinaFace / PaddleOCR / Presidio onto the GPU, once).
+# Loaded-once model registry (PLAN §4.2): perception weights live here for the app's
+# lifetime and are reused across requests, never reloaded. Empty until the lifespan
+# below populates it; in the light venv (no torch) the loaders return None and the
+# server still boots and serves EXIF-only — reliability first.
 MODELS: dict = {}
+
+# Reject request bodies larger than this before reading them (deferred Phase-1 item:
+# avoids decoding an attacker-sized upload into memory).
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB
+
+
+def _pick_device() -> str:
+    """'cuda' if a torch CUDA device is available, else 'cpu'. Safe in the light venv."""
+    try:
+        import torch
+
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        return "cpu"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Phase 2+: load the perception models here and stash handles in MODELS so they
-    # are reused across requests (never reloaded per-request).
-    print("[startup] Overshare ready - Phase 1 (EXIF only, no GPU models loaded yet).")
+    from backend.pipelines.faces import load_face_model
+    from backend.pipelines.objects import load_yolo_model
+
+    device = _pick_device()
+    MODELS["device"] = device
+    MODELS["cuda_available"] = device == "cuda"
+    MODELS["yolo"] = load_yolo_model(device)
+    MODELS["face"] = load_face_model(device)
+    loaded = [k for k in ("yolo", "face") if MODELS.get(k) is not None]
+    print(
+        f"[startup] Overshare ready - Phase 2. device={device}; "
+        f"perception loaded: {loaded or 'none (EXIF-only)'}"
+    )
     yield
     MODELS.clear()
 
 
-app = FastAPI(title="Overshare", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Overshare", version="0.2.0", lifespan=lifespan)
 
 # Dev-friendly CORS so the throwaway page works even when opened from file://.
 app.add_middleware(
@@ -47,7 +80,15 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "phase": 1}
+    # `cuda_available` lets a probe tell an intentional EXIF-only boot (no torch /
+    # no GPU) apart from a GPU box where models silently failed to load.
+    return {
+        "status": "ok",
+        "phase": 2,
+        "device": MODELS.get("device", "cpu"),
+        "cuda_available": MODELS.get("cuda_available", False),
+        "models": [k for k in ("yolo", "face") if MODELS.get(k) is not None],
+    }
 
 
 @app.get("/")
@@ -89,16 +130,46 @@ async def _parse_request(request: Request):
 
 @app.post("/analyze")
 async def analyze(request: Request):
-    # Phase 2 hardening (do when heavyweight models land at this call site):
-    #   - cap upload size before reading (Content-Length -> 413) to avoid OOM,
-    #   - offload run_pipelines via run_in_threadpool so GPU/CPU work doesn't
-    #     block the event loop. Both are cheap and unnecessary for EXIF-only.
-    image_bytes, text, username = await _parse_request(request)
-    signals, models_run = run_pipelines(
-        image_bytes=image_bytes, text=text, username=username
+    too_large = JSONResponse(
+        {"detail": f"Upload too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB)."},
+        status_code=413,
     )
-    report = build_report(signals, models_run)
-    # image_bytes goes out of scope here — nothing is persisted.
+    # Fast path: reject an honest oversized upload before reading anything.
+    try:
+        clen = int(request.headers.get("content-length", "0") or "0")
+    except ValueError:
+        clen = 0
+    if clen > MAX_UPLOAD_BYTES:
+        return too_large
+
+    # Enforce the cap while STREAMING the body, before it is buffered/parsed. This
+    # closes two holes a Content-Length-only check leaves open: a chunked-transfer
+    # request (no Content-Length) and a giant JSON `text` body — both would otherwise
+    # be read fully into RAM. We cache the capped bytes on the request so the
+    # downstream .form()/.json() parse reuses them instead of re-reading the stream.
+    buf = bytearray()
+    try:
+        async for chunk in request.stream():
+            buf += chunk
+            if len(buf) > MAX_UPLOAD_BYTES:
+                return too_large
+    except Exception:
+        buf = bytearray()
+    request._body = bytes(buf)  # Starlette: a set _body short-circuits stream()/body()
+
+    image_bytes, text, username = await _parse_request(request)
+
+    # Offload the perception work to a worker thread: model inference is sync and
+    # CPU/GPU-bound, so running it inline would block the event loop for other requests.
+    signals, models_run = await run_in_threadpool(
+        run_pipelines, image_bytes, text, username, MODELS
+    )
+    annotated_image = None
+    if image_bytes:
+        annotated_image = await run_in_threadpool(annotate, image_bytes, signals)
+
+    report = build_report(signals, models_run, annotated_image)
+    # image_bytes goes out of scope here — nothing is persisted (meta.stored=False).
     # mode="json" + the Evidence.raw validator guarantee a serializable payload
-    # no matter what a future extractor stuffs into evidence.raw.
+    # no matter what an extractor stuffs into evidence.raw.
     return JSONResponse(report.model_dump(mode="json"))

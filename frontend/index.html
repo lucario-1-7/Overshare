@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Overshare — Phase 1 proof</title>
+  <title>Overshare — Phase 2 proof</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -47,8 +47,8 @@
   </style>
 </head>
 <body>
-  <h1>OVERSHARE · PHASE 1 PROOF</h1>
-  <div class="sub">spine check — drop a photo / paste text → raw <code>/analyze</code> Report JSON</div>
+  <h1>OVERSHARE · PHASE 2 PROOF</h1>
+  <div class="sub">drop a photo → YOLO + RetinaFace draw boxes → signals + raw <code>/analyze</code> Report JSON</div>
 
   <div class="wrap">
     <div class="panel">
@@ -67,6 +67,10 @@
     </div>
 
     <div class="panel">
+      <div id="annotatedWrap" style="display:none">
+        <label style="margin-top:0">Annotated image (boxes drawn server-side)</label>
+        <img id="annotated" class="preview" style="display:block" alt="annotated" />
+      </div>
       <div id="chips"></div>
       <div id="reportMeta" class="meta"></div>
       <pre id="out">// Report JSON appears here</pre>
@@ -81,6 +85,8 @@
     const chips = document.getElementById('chips');
     const reportMeta = document.getElementById('reportMeta');
     const statusEl = document.getElementById('status');
+    const annotated = document.getElementById('annotated');
+    const annotatedWrap = document.getElementById('annotatedWrap');
     let pickedFile = null;
 
     function setFile(f) {
@@ -111,6 +117,7 @@
       }
       statusEl.textContent = 'Analyzing…';
       chips.innerHTML = ''; reportMeta.textContent = '';
+      annotatedWrap.style.display = 'none';
       try {
         let res;
         if (pickedFile) {
@@ -128,6 +135,10 @@
         }
         const rep = await res.json();
         out.textContent = JSON.stringify(rep, null, 2);
+        if (rep.annotatedImage) {
+          annotated.src = rep.annotatedImage;
+          annotatedWrap.style.display = 'block';
+        }
         chips.innerHTML = (rep.signals || [])
           .map(s => `<span class="chip">${s.type}: ${s.value}</span>`).join('') ||
           '<span class="meta">no signals detected</span>';

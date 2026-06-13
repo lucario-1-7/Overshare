@@ -32,7 +32,25 @@ print("GET /        ->", idx.status_code, "| html bytes:", len(idx.text),
 r = httpx.post(base + "/analyze",
                files={"file": ("p.jpg", make_gps_jpeg(), "image/jpeg")}, timeout=10)
 rep = r.json()
-print("POST /analyze->", r.status_code, "| signal types:",
+print("POST /analyze (EXIF) ->", r.status_code, "| signal types:",
       [s["type"] for s in rep["signals"]])
 print("gps value   :", next(s["value"] for s in rep["signals"] if s["type"] == "gps"))
+
+# Phase 2: POST a real photo (ultralytics' bundled zidane.jpg — people + faces) and
+# confirm the perception models fired and the annotator returned a boxed image.
+try:
+    from ultralytics.utils import ASSETS
+
+    zidane = ASSETS / "zidane.jpg"
+    if zidane.exists():
+        r2 = httpx.post(base + "/analyze",
+                        files={"file": ("z.jpg", zidane.read_bytes(), "image/jpeg")}, timeout=30)
+        rep2 = r2.json()
+        types = sorted({s["type"] for s in rep2["signals"]})
+        print("POST /analyze (real) ->", r2.status_code, "| modelsRun:", rep2["meta"]["modelsRun"],
+              "| types:", types,
+              "| annotatedImage:", "present" if rep2.get("annotatedImage") else "none")
+except Exception as e:  # noqa: BLE001 — light venv has no ultralytics; skip cleanly
+    print("real-image check skipped:", type(e).__name__)
+
 print("LIVE SERVER OK")

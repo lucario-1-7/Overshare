@@ -39,9 +39,30 @@ def dl_yolo() -> None:
 
 
 def dl_retinaface() -> None:
-    from retinaface.RetinaFace import build_model
+    import os
+    import time
 
-    build_model()  # pulls the pretrained weights on first build
+    import facexlib
+    import torch
+    from facexlib.detection import init_detection_model
+
+    # facexlib does NOT resume/re-download a partial file (it only checks existence),
+    # so a connection drop mid-download leaves a corrupt weight that then fails to
+    # load forever. Drop any incomplete file and retry — networks at hour 18 flake.
+    target = os.path.join(os.path.dirname(facexlib.__file__), "weights",
+                          "detection_Resnet50_Final.pth")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    last = None
+    for _ in range(5):
+        if os.path.exists(target) and os.path.getsize(target) < 100_000_000:
+            os.remove(target)
+        try:
+            init_detection_model("retinaface_resnet50", half=False, device=device)
+            return
+        except Exception as e:  # noqa: BLE001 — retry transient download failures
+            last = e
+            time.sleep(2)
+    raise last  # surfaced by _try as a [warn]
 
 
 def dl_paddleocr() -> None:

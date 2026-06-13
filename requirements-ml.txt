@@ -9,7 +9,9 @@
 #     pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 ultralytics>=8.1          # YOLOv8 (stock COCO) — objects, home indicators, documents
-retina-face>=0.0.17       # RetinaFace — face DETECTION only (never recognition)
+facexlib>=0.3.0           # torch RetinaFace — face DETECTION only (never recognition).
+                          # Chosen over TF `retina-face`: single (torch) framework on the
+                          # GPU; TensorFlow has no native-Windows GPU support.
 paddleocr>=2.7            # OCR (primary)
 paddlepaddle-gpu          # PaddleOCR GPU backend
 easyocr>=1.7              # OCR fallback
