@@ -13,6 +13,7 @@ async event loop).
 """
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -49,6 +50,7 @@ def _pick_device() -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from backend.pipelines.faces import load_face_model
+    from backend.pipelines.loaders import load_phase3_models
     from backend.pipelines.objects import load_yolo_model
 
     device = _pick_device()
@@ -56,10 +58,13 @@ async def lifespan(app: FastAPI):
     MODELS["cuda_available"] = device == "cuda"
     MODELS["yolo"] = load_yolo_model(device)
     MODELS["face"] = load_face_model(device)
-    loaded = [k for k in ("yolo", "face") if MODELS.get(k) is not None]
+    # Phase 3 fills these (PaddleOCR, Presidio) inside its own loaders module — no
+    # edits to this file required. No-ops until Phase 3 lands.
+    load_phase3_models(MODELS, device)
+    loaded = [k for k in ("yolo", "face", "ocr", "pii") if MODELS.get(k) is not None]
     print(
-        f"[startup] Overshare ready - Phase 2. device={device}; "
-        f"perception loaded: {loaded or 'none (EXIF-only)'}"
+        f"[startup] Overshare ready. device={device}; "
+        f"models loaded: {loaded or 'none (EXIF-only)'}"
     )
     yield
     MODELS.clear()
@@ -97,6 +102,19 @@ def index():
     if idx.exists():
         return FileResponse(idx)
     return JSONResponse({"detail": "frontend/index.html not found"}, status_code=404)
+
+
+# Golden, fully-populated Report fixture (signals + graph + risks + attackPath + fixes).
+# Lets the Phase 5 frontend develop against a real endpoint before Phase 3/4 land, and
+# serves as the canonical example of the frozen Report contract (PLAN §4.12).
+_SAMPLE_REPORT = Path(__file__).resolve().parent.parent / "fixtures" / "report_sample.json"
+
+
+@app.get("/sample-report")
+def sample_report():
+    if _SAMPLE_REPORT.exists():
+        return JSONResponse(json.loads(_SAMPLE_REPORT.read_text(encoding="utf-8")))
+    return JSONResponse({"detail": "fixtures/report_sample.json not found"}, status_code=404)
 
 
 async def _parse_request(request: Request):
