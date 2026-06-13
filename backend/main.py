@@ -81,6 +81,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- ADDITIVE: isolated "extras" module (digital-footprint intelligence) ---------
+# Mounts an opt-in /extras/footprint endpoint. Does NOT alter /analyze or any core
+# behavior, and is wrapped so a broken/absent extras package can never break the app.
+try:
+    from backend.extras.api import router as extras_router
+
+    app.include_router(extras_router)
+    print("[extras] digital-footprint module mounted at /extras")
+except Exception as _e:  # noqa: BLE001 — extras must never take down the core API
+    print(f"[extras] not mounted ({type(_e).__name__}: {_e}); core API unaffected.")
+
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 
