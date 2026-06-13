@@ -19,7 +19,9 @@ from .pattern import build_profile
 
 router = APIRouter(prefix="/extras", tags=["extras: digital footprint"])
 
-_MAX_POSTS = 25  # bound the multi-post upload
+_MAX_POSTS = 25  # bound the multi-post upload (count)
+_MAX_FILE_BYTES = 25 * 1024 * 1024   # per-image cap (matches /analyze)
+_MAX_TOTAL_BYTES = 100 * 1024 * 1024  # total across the batch
 
 
 class FootprintRequest(BaseModel):
@@ -70,13 +72,19 @@ async def profile(request: Request):
         return JSONResponse({"detail": "No image files provided (field `files`)."}, status_code=400)
 
     posts = []
+    total = 0
     for up in uploads:
         try:
-            data = await up.read()
+            # Read at most one byte past the cap so an oversized image is skipped
+            # without buffering it all into RAM (same protection as /analyze).
+            data = await up.read(_MAX_FILE_BYTES + 1)
         except Exception:
             continue
-        if not data:
+        if not data or len(data) > _MAX_FILE_BYTES:
             continue
+        total += len(data)
+        if total > _MAX_TOTAL_BYTES:
+            break
         sigs, _run = await run_in_threadpool(run_pipelines, data, None, None, MODELS)
         posts.append(sigs)
 

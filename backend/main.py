@@ -14,6 +14,7 @@ async event loop).
 from __future__ import annotations
 
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -73,12 +74,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Overshare", version="0.2.0", lifespan=lifespan)
 
-# Dev-friendly CORS so the throwaway page works even when opened from file://.
+# CORS: defaults open ("*") for the local demo, but lock it down for a public tunnel
+# by setting OVERSHARE_CORS_ORIGINS to a comma-separated allowlist. Methods/headers are
+# scoped to what the app actually uses (the API is GET/POST JSON + multipart only, no
+# auth/cookies — so an open origin can't steal credentials, only drive the endpoints).
+_origins_env = os.environ.get("OVERSHARE_CORS_ORIGINS", "*").strip()
+_allow_origins = ["*"] if _origins_env == "*" else [o.strip() for o in _origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allow_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 # --- ADDITIVE: isolated "extras" module (digital-footprint intelligence) ---------

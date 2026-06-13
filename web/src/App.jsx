@@ -39,7 +39,7 @@ function Header({ view, setView }) {
             What a stranger could infer about you — across a single post and your whole digital footprint.
           </p>
         </div>
-        <span className="chip border-neon/40 text-neon">on-device · nothing leaves this machine</span>
+        <span className="chip border-neon/40 text-neon">images stay on-device · footprint sends only what you type</span>
       </div>
 
       {/* page nav */}
@@ -67,7 +67,7 @@ function Header({ view, setView }) {
 function Footer() {
   return (
     <footer className="mt-8 border-t border-line pt-4 text-center text-xs text-muted/70">
-      Overshare · ARCNIGHT 2026 · CyberTech — all inference runs locally, no external model API.
+      Overshare · ARCNIGHT 2026 · CyberTech — image inference runs locally; footprint lookups send only the identifier you enter.
     </footer>
   )
 }

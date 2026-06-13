@@ -8,35 +8,29 @@ import Section from '../components/Section.jsx'
 //   • Multi-post pattern: several images → the core pipeline per post, aggregated by the
 //     Pattern Engine into recurring entities, exposure consistency/trend, and insights.
 export default function FootprintPage({ health }) {
+  // State lives here and flows down via props — the two tools report results up
+  // through onResult callbacks. (No module-level store: that mutated refs during
+  // render and left stale setters when the tab unmounted mid-fetch.)
+  const [fp, setFp] = useState(null)
+  const [profile, setProfile] = useState(null)
+
   return (
     <div className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
       <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-        <IdentityTool health={health} />
-        <MultiPostTool />
+        <IdentityTool health={health} onResult={setFp} />
+        <MultiPostTool onResult={setProfile} />
         <p className="px-1 text-xs leading-relaxed text-muted/70">
           Image analysis stays local. Footprint lookups send <span className="text-fg">only the
           identifier you enter</span> (email / username) to free, key-free public sources — never an
           image. The report shows exactly what left the machine.
         </p>
       </div>
-      <ResultsColumn />
+      <ResultsColumn fp={fp} profile={profile} />
     </div>
   )
 }
 
-/* ----------------------------------------------------------------------------- */
-/* The two tools share results via a tiny module-level store so the right column  */
-/* can render whichever was produced last without prop-drilling through App.       */
-/* ----------------------------------------------------------------------------- */
-let _setFootprint = () => {}
-let _setProfile = () => {}
-
-function ResultsColumn() {
-  const [fp, setFp] = useState(null)
-  const [profile, setProfile] = useState(null)
-  _setFootprint = setFp
-  _setProfile = setProfile
-
+function ResultsColumn({ fp, profile }) {
   if (!fp && !profile) {
     return (
       <div className="panel grid min-h-[280px] place-items-center p-8 text-center">
@@ -60,7 +54,7 @@ function ResultsColumn() {
 
 /* --------------------------------- tools ----------------------------------- */
 
-function IdentityTool({ health }) {
+function IdentityTool({ health, onResult }) {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
@@ -71,7 +65,7 @@ function IdentityTool({ health }) {
     setError('')
     try {
       const rep = await footprint({ email: e ?? email.trim(), username: u ?? username.trim() })
-      _setFootprint(rep)
+      onResult(rep)
     } catch (err) {
       setError(String(err?.message || err))
     } finally {
@@ -131,7 +125,7 @@ function IdentityTool({ health }) {
   )
 }
 
-function MultiPostTool() {
+function MultiPostTool({ onResult }) {
   const inputRef = useRef(null)
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(false)
@@ -142,7 +136,7 @@ function MultiPostTool() {
     setError('')
     try {
       const rep = await analyzeProfile(files)
-      _setProfile(rep)
+      onResult(rep)
     } catch (err) {
       setError(String(err?.message || err))
     } finally {
@@ -343,19 +337,20 @@ function FootprintSignalRow({ sig }) {
 const TREND_COLOR = { increasing: '#ff7b72', decreasing: '#7ee787', stable: '#79c0ff', 'n/a': '#8b949e' }
 
 function ProfileResult({ report }) {
+  // Defaults: the extras responses aren't run through normalizeReport, so guard fields.
   const scores = report.perPostScores || []
   const max = Math.max(1, ...scores)
+  const footprintScore = report.footprintScore ?? 0
+  const consistency = report.exposureConsistency ?? 0
+  const trend = report.exposureTrend || 'n/a'
+  const totalPosts = report.totalPosts ?? 0
   return (
-    <Section title="Multi-post pattern" hint={`${report.totalPosts} post(s)`}>
+    <Section title="Multi-post pattern" hint={`${totalPosts} post(s)`}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Footprint" value={report.footprintScore} color={scoreColor(report.footprintScore)} />
-        <Stat
-          label="Exposure consistency"
-          value={`${report.exposureConsistency}%`}
-          color={scoreColor(report.exposureConsistency)}
-        />
-        <Stat label="Trend" value={report.exposureTrend} color={TREND_COLOR[report.exposureTrend] || '#8b949e'} small />
-        <Stat label="Posts" value={report.totalPosts} color="#79c0ff" />
+        <Stat label="Footprint" value={footprintScore} color={scoreColor(footprintScore)} />
+        <Stat label="Exposure consistency" value={`${consistency}%`} color={scoreColor(consistency)} />
+        <Stat label="Trend" value={trend} color={TREND_COLOR[trend] || '#8b949e'} small />
+        <Stat label="Posts" value={totalPosts} color="#79c0ff" />
       </div>
 
       {/* per-post exposure sparkline */}

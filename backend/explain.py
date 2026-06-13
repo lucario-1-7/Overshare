@@ -12,7 +12,8 @@ Local Ollama only — no external model API in the critical path (PLAN §7), so 
 "nothing leaves this machine" guarantee holds. Configurable via env:
     OLLAMA_HOST     (default http://localhost:11434)
     OLLAMA_MODEL    (default llama3.2)
-    OLLAMA_TIMEOUT  (seconds, default 20)
+    OLLAMA_TIMEOUT  (seconds, default 6 — kept low so a hung-but-reachable Ollama
+                     can't add latency to every /analyze response)
     OVERSHARE_NO_LLM=1  -> skip entirely
 """
 from __future__ import annotations
@@ -60,9 +61,9 @@ def generate_explanation(report: Report) -> Optional[str]:
     host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
     model = os.environ.get("OLLAMA_MODEL", "llama3.2")
     try:
-        timeout = float(os.environ.get("OLLAMA_TIMEOUT", "20"))
+        timeout = float(os.environ.get("OLLAMA_TIMEOUT", "6"))
     except ValueError:
-        timeout = 20.0
+        timeout = 6.0
 
     try:
         import requests

@@ -14,12 +14,33 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from typing import List, Optional
 
 from .models import FootprintSignal
 
 _TIMEOUT = 4.0
 _UA = {"User-Agent": "Overshare-Extras/1.0 (privacy self-audit)"}
+
+# Strict email shape — used to gate the email BEFORE it is interpolated into an
+# outbound URL path. Forbids '/', '?', '#', whitespace, and a second '@', so a
+# crafted value can't rewrite the request target (path/query/host injection).
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
+
+
+def _valid_email(email: str) -> bool:
+    return bool(email) and len(email) <= 254 and bool(_EMAIL_RE.match(email))
+
+
+def _valid_handle(h: str) -> bool:
+    # Leading alnum + no '..' so a handle can't become a traversal/odd path segment.
+    return (
+        bool(h)
+        and 1 <= len(h) <= 39
+        and h[:1].isalnum()
+        and ".." not in h
+        and all(c.isalnum() or c in "-_." for c in h)
+    )
 
 _FREEMAIL = {
     "gmail.com", "googlemail.com", "yahoo.com", "ymail.com", "outlook.com",
@@ -84,11 +105,14 @@ def check_breaches(email: str) -> List[FootprintSignal]:
         names = _CANNED_BREACH.get(email.strip().lower(), ["Adobe", "Canva", "LinkedIn"])
         return [FootprintSignal(type="breach_exposure", value=f"{len(names)} breaches",
                                 source="xposedornot", detail={"count": len(names), "names": names, "canned": True})]
+    e = email.strip()
+    if not _valid_email(e):  # reject anything that could distort the outbound URL path
+        return []
     requests = _requests()
     if requests is None:
         return []
     try:
-        r = requests.get(f"https://api.xposedornot.com/v1/check-email/{email.strip()}",
+        r = requests.get(f"https://api.xposedornot.com/v1/check-email/{e}",
                          headers=_UA, timeout=_TIMEOUT)
         if r.status_code != 200:
             return []
@@ -143,7 +167,7 @@ def check_presence(username: str) -> List[FootprintSignal]:
     handle = username.strip().lstrip("@")
     if "@" in handle:
         handle = handle.split("@", 1)[0]
-    if not (1 <= len(handle) <= 39 and all(c.isalnum() or c in "-_." for c in handle)):
+    if not _valid_handle(handle):
         return []
 
     if _canned_on() or handle.lower() in _CANNED_USER:
@@ -159,7 +183,9 @@ def check_presence(username: str) -> List[FootprintSignal]:
     for site, template in _PRESENCE_SITES:
         url = template.format(u=handle)
         try:
-            resp = requests.get(url, headers=_UA, timeout=_TIMEOUT, allow_redirects=True)
+            # No redirect-following: the canonical profile URLs answer 200 directly, and
+            # not following redirects keeps the request locked to the intended host.
+            resp = requests.get(url, headers=_UA, timeout=_TIMEOUT, allow_redirects=False)
             if resp.status_code == 200:
                 profile = url.replace("/about.json", "")
                 out.append(FootprintSignal(type="platform_presence", value=f"{handle} ({site})",

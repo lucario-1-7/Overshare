@@ -1,5 +1,10 @@
 # Overshare — Parallel Build Handoff (Phases 3 · 4 · 5)
 
+> **⏳ Historical document.** Phases 3, 4, and 5 (plus Phase 7 and the extras module)
+> are now **implemented and merged to `main`** — see the PHASE3/4/7 + EXTRAS summaries
+> and the `web/` app. The "stubs return empty / fill in the bodies" instructions below
+> are **no longer current**; this is kept for its architecture & seam description.
+
 Phases 1 & 2 are done and on `main` (EXIF + YOLO + RetinaFace + Annotator, verified on
 GPU). This doc lets **three people build Phases 3, 4, and 5 at the same time** without
 blocking or conflicting with each other.

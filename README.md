@@ -8,7 +8,10 @@ Drop a photo, screenshot, caption, or username — and Overshare shows you exact
 a stranger could figure out about you, as an **exposure graph + risk scores + an
 attack-path narrative + one-click fixes**.
 
-Everything runs **on-device**. Nothing is stored. No external model API is ever called.
+Image, screenshot, and caption analysis runs **fully on-device** — processed in memory,
+never written to disk, no external model API. The optional **Digital Footprint** lookups
+send *only an identifier you type* (email / username) to free public breach/profile APIs —
+never your image — and the report shows exactly what left the machine.
 
 *Built for **ARCNIGHT 2026 · CyberTech**.*
 
@@ -41,10 +44,13 @@ the damage *before* you post — then helps you undo it.
 - 🛠️ **Suggests fixes** — concrete remediations, including a **one-click EXIF-GPS strip**.
 - 🖼️ **Annotates the image** — every detection drawn as a labelled box (the proof the AI is real).
 - 🧠 **Explains it in plain English** — an optional local LLM (Ollama) writes the summary; if it's down, the report ships anyway.
+- 🌐 **Digital Footprint (opt-in extras)** — a second page: given an email/username it checks **breach exposure** (XposedOrNot), **public accounts** (GitHub/Reddit/GitLab/dev.to), **email domain**, and **Gravatar** → a footprint score, attacker-effort estimate, inference-amplification factor, and a time-to-exploit timeline. Sends only the identifier you type — never an image.
 
-All of it **on-device**: uploads are processed in memory, never written to disk, no
-database, and **no external model API in the critical path** — verifiable in the
-browser's network tab.
+Image/text analysis is **fully on-device**: uploads are processed in memory, never
+written to disk, no database, and **no external model API in the `/analyze` critical
+path** — verifiable in the network tab. The opt-in Digital Footprint lookups are the one
+exception: they send only the email/username you enter to free public APIs (never an
+image), and the report's `meta.sentToExternal` lists exactly what was sent.
 
 ---
 
@@ -147,6 +153,9 @@ watch the exposure graph, risk meters, attack path, and fixes light up.
 | `GET /health` | `{ status, phase, device, cuda_available, models }`. |
 | `GET /sample-report` | A fully-populated example `Report`. |
 | `GET /` | The bundled proof UI. |
+| `POST /extras/footprint` | *(extras)* Email/username → a `FootprintReport` (breach / presence / domain / Gravatar + score, attacker effort, amplification, timeline). Sends the identifier to public APIs. |
+| `POST /extras/profile` | *(extras)* Several images → a `ProfileReport` (multi-post Pattern Engine: recurring entities, exposure consistency/trend, insights). |
+| `GET /extras/health` | *(extras)* Module status + the public sources it queries. |
 
 ### The `Report` — the only thing the frontend consumes
 
@@ -211,7 +220,13 @@ backend/
     attack.py            Attack-Path Generator (templates)
     fix.py               Fix Engine
     engine.py            aggregator (the seam assemble.py calls)
-web/                     React + Tailwind + react-flow frontend
+  extras/                ── ADDITIVE · opt-in · mounted at /extras ──
+    collectors.py        external lookups: XposedOrNot · Gravatar · GitHub · presence
+    footprint.py         footprint score / attacker effort / amplification / timeline
+    pattern.py           multi-post Pattern Engine
+    api.py               /extras/footprint · /extras/profile · /extras/health
+    models.py            FootprintReport / ProfileReport (separate from the frozen contracts)
+web/                     React + Tailwind + react-flow frontend (Scanner + Digital Footprint pages)
 fixtures/
   signals_sample.json    every SignalType, for tests/dev
   report_sample.json     a fully-populated Report
@@ -229,8 +244,11 @@ requirements-ml.txt      the heavy ML stack
 
 ## Privacy & ethics
 
-- **Nothing leaves the machine.** In-memory processing, no disk, no database, no
-  external model API in the critical path. `meta.stored = false` is shown in the UI.
+- **Your images never leave the machine.** Image/text analysis is in-memory — no disk,
+  no database, no external model API. `meta.stored = false` is shown in the UI. The opt-in
+  Digital Footprint module is the one exception: it sends only the email/username you enter
+  to free public breach/profile lookups (never an image) and surfaces exactly what was sent
+  via `meta.sentToExternal`.
 - **Faces are detected, never recognized.** RetinaFace finds faces to box them; it
   does not match anyone against the web. "Face matched" appears only as a
   *hypothetical* step in the attack narrative — never something the tool performs.
@@ -242,6 +260,11 @@ requirements-ml.txt      the heavy ML stack
 
 - **[PLAN.md](PLAN.md)** — the full design & connection map (source of truth).
 - **[PHASE_HANDOFF.md](PHASE_HANDOFF.md)** — how the perception / intelligence / frontend layers fit together.
-- **[PHASE1_SUMMARY.md](PHASE1_SUMMARY.md)** · **[PHASE2_SUMMARY.md](PHASE2_SUMMARY.md)** — build notes.
+- **Build notes:** [PHASE1](PHASE1_SUMMARY.md) · [PHASE2](PHASE2_SUMMARY.md) · [PHASE3](PHASE3_SUMMARY.md) · [PHASE4](PHASE4_SUMMARY.md) · [PHASE7](PHASE7_SUMMARY.md)
+- **[EXTRAS_SUMMARY.md](EXTRAS_SUMMARY.md)** — the Digital Footprint module · **[IMPROVEMENTS.md](IMPROVEMENTS.md)** — backlog.
 
-<div align="center"><sub>Overshare · ARCNIGHT 2026 · runs entirely on your machine.</sub></div>
+## License
+
+Released under the [MIT License](LICENSE).
+
+<div align="center"><sub>Overshare · ARCNIGHT 2026 · image analysis runs entirely on your machine.</sub></div>

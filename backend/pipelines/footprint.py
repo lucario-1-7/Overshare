@@ -45,7 +45,15 @@ def _normalize(username: str) -> str:
 
 
 def _valid_handle(h: str) -> bool:
-    return bool(h) and 1 <= len(h) <= 39 and all(c.isalnum() or c in "-_." for c in h)
+    # Leading alnum + no '..' so an interpolated handle can't become a traversal
+    # or odd path segment in the outbound profile-URL probes.
+    return (
+        bool(h)
+        and 1 <= len(h) <= 39
+        and h[:1].isalnum()
+        and ".." not in h
+        and all(c.isalnum() or c in "-_." for c in h)
+    )
 
 
 def _canned(handle: str) -> List[Signal]:

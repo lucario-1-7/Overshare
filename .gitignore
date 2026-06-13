@@ -19,9 +19,14 @@ test_clean.jpg
 
 # Model weights / caches (pulled by scripts/download_weights.py)
 *.pt
+*.pth
 *.onnx
 weights/
 .cache/
+
+# Secrets / local env
+.env
+.env.*
 
 # Claude Code harness (local tooling, not part of the project)
 .claude/
