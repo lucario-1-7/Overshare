@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+.venv-ml/
+venv/
+env/
+
+# Generated test fixtures
+test_gps.jpg
+test_clean.jpg
+
+# Model weights / caches (pulled by scripts/download_weights.py)
+*.pt
+*.onnx
+weights/
+.cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

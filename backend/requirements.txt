@@ -1,0 +1,8 @@
+# Phase 1 — light backend. Boots instantly, no GPU/ML libs.
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9   # required by FastAPI to parse multipart form uploads
+pillow>=10.0              # EXIF read
+piexif>=1.1.3             # EXIF write for test fixtures only (runtime parse uses Pillow)
+pydantic>=2.5
+httpx>=0.27               # used by fastapi.testclient for the smoke test
