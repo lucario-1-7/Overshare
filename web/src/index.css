@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-ink text-fg font-mono antialiased;
+    /* subtle arcade grid */
+    background-image:
+      linear-gradient(rgba(126, 231, 135, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126, 231, 135, 0.035) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  /* slim scrollbars to match the dark theme */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2b3340 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #2b3340;
+    border-radius: 999px;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-line bg-panel shadow-panel;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs leading-none;
+  }
+  .btn {
+    @apply rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-[#238636] text-white hover:bg-[#2ea043];
+  }
+  .btn-ghost {
+    @apply btn border border-line bg-transparent text-fg hover:border-neon hover:text-neon;
+  }
+  .section-title {
+    @apply flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-muted;
+  }
+}
+
+/* react-flow tweaks for the dark theme */
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__controls button {
+  background: #11161f;
+  border-bottom: 1px solid #21262d;
+  color: #e6edf3;
+}
+.react-flow__controls button:hover {
+  background: #1b2230;
+}
