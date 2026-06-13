@@ -1,20 +1,12 @@
-"""Fix Engine (PLAN §4.10) — PHASE 4 LANE.  [STUB — fill this in]
+"""Fix Engine (PLAN §4.10) — PHASE 4 LANE.
 
-Map each risky signal to a concrete remediation. The one-click EXIF-GPS strip is the
-satisfying demo closer.
+Map each PRESENT risky signal type to a concrete remediation. The one-click
+EXIF-GPS strip is the satisfying demo closer.
 
-CONTRACT (do not change the signature; engine.py already calls it):
-    suggest_fixes(signals) -> List[Fix]        # from backend.contracts.report
+CONTRACT (engine.py already calls it):  suggest_fixes(signals) -> List[Fix]
 
-Fix(issue, action, oneClick). Mapping (PLAN §4.10):
-    gps          -> "Strip EXIF GPS & re-download clean image"   oneClick=True
-    face         -> "Blur faces / avoid identifiable shots"      oneClick=False
-    employer     -> "Crop the lanyard/badge before posting"      oneClick=False
-    location     -> "Remove the place name from the caption"     oneClick=False
-    email|phone  -> "Redact contact info"                        oneClick=False
-    username     -> "Lock down / unlink exposed profiles"        oneClick=False
-
-Only emit a fix for a signal type that is actually present. De-dup by issue.
+Only emits a fix for a type that is actually present; de-duped by issue. Wording +
+order mirror fixtures/report_sample.json so the Phase 5 UI matches real output.
 """
 from __future__ import annotations
 
@@ -25,7 +17,26 @@ from backend.contracts.signal import Signal
 
 
 def suggest_fixes(signals: List[Signal]) -> List[Fix]:
-    """PHASE 4: map present risky signal types to Fix entries (de-duped).
-    Stub returns [] (current behavior)."""
-    # TODO(phase4): for each present risky type, append the mapped Fix; de-dup by issue.
-    return []
+    t = {s.type for s in signals}
+    fixes: List[Fix] = []
+    seen: set = set()
+
+    def add(issue: str, action: str, one_click: bool = False) -> None:
+        if issue not in seen:
+            seen.add(issue)
+            fixes.append(Fix(issue=issue, action=action, oneClick=one_click))
+
+    if "gps" in t:
+        add("EXIF GPS", "Strip EXIF GPS & re-download a clean image", True)  # the one-click closer
+    if "face" in t:
+        add("Face visible", "Blur faces / avoid identifiable shots")
+    if "employer" in t:
+        add("Employer badge", "Crop the lanyard/badge before posting")
+    if "location" in t:
+        add("Location in caption", "Remove the place name from the caption")
+    if "email" in t or "phone" in t:
+        add("Contact info", "Redact the exposed email/phone")
+    if "username" in t:
+        add("Username footprint", "Lock down / unlink exposed profiles")
+
+    return fixes
