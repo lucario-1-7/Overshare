@@ -84,7 +84,7 @@ RAW INPUT → [perception models] → signals[] → [graph + risk + attack + fix
 
 The `Signal` and `Report` schemas are frozen in
 [`backend/contracts/`](backend/contracts/), so any model can be added or swapped
-without the intelligence layer ever changing. Full design: [PLAN.md](PLAN.md).
+without the intelligence layer ever changing.
 
 ---
 
@@ -102,9 +102,17 @@ without the intelligence layer ever changing. Full design: [PLAN.md](PLAN.md).
 
 ---
 
-## Quick start
+## Installation & running
 
-> Requires an NVIDIA GPU + recent driver, and **Python 3.11** (`py -3.11`).
+> Requires an NVIDIA GPU + recent driver, and **Python 3.11** (`py -3.11`). No GPU is
+> fine too — see the note after step 1.
+
+### 0. Clone
+
+```bash
+git clone https://github.com/lucario-1-7/Overshare.git
+cd Overshare
+```
 
 ### 1. Backend (vision + text stack)
 
@@ -255,13 +263,6 @@ requirements-ml.txt      the heavy ML stack
 - **Defensive by design.** Overshare exists to help people reduce their *own* exposure.
 
 ---
-
-## Documentation
-
-- **[PLAN.md](PLAN.md)** — the full design & connection map (source of truth).
-- **[PHASE_HANDOFF.md](PHASE_HANDOFF.md)** — how the perception / intelligence / frontend layers fit together.
-- **Build notes:** [PHASE1](PHASE1_SUMMARY.md) · [PHASE2](PHASE2_SUMMARY.md) · [PHASE3](PHASE3_SUMMARY.md) · [PHASE4](PHASE4_SUMMARY.md) · [PHASE7](PHASE7_SUMMARY.md)
-- **[EXTRAS_SUMMARY.md](EXTRAS_SUMMARY.md)** — the Digital Footprint module · **[IMPROVEMENTS.md](IMPROVEMENTS.md)** — backlog.
 
 ## License
 

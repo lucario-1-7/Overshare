@@ -1,4 +1,4 @@
-# Overshare — Web UI (Phase 5)
+# Overshare — Web UI
 
 React + Tailwind + react-flow frontend. It is **dumb by design**: it only ever reads
 the `Report` contract (`backend/contracts/`) and renders it into fixed sections —
@@ -27,7 +27,7 @@ No backend handy? Click **Load sample** — it renders an embedded copy of
 ## Notes
 
 - Develops against the **frozen contract** — every field is treated as optional-friendly
-  (`annotatedImage` may be `null`, `graph` may be empty), so partial Phase 1–4 reports render fine.
+  (`annotatedImage` may be `null`, `graph` may be empty), so partial reports render fine.
 - The **one-click EXIF strip** (Fixes panel) re-encodes the uploaded image via a canvas
   entirely in the browser — it drops all metadata and downloads a clean copy. Nothing is uploaded for that step.
-- Build: `npm run build` → `dist/` (servable from the backend origin behind the Phase 6 tunnel).
+- Build: `npm run build` → `dist/` (servable from the backend origin behind the tunnel).
