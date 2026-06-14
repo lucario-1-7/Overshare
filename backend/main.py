@@ -22,6 +22,7 @@ from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.annotator import annotate
 from backend.assemble import build_report
@@ -100,6 +101,15 @@ except Exception as _e:  # noqa: BLE001 — extras must never take down the core
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
+# Phase 6 (deploy): serve the built React SPA (web/dist) so the whole app — UI + API —
+# lives behind ONE origin, ready for a single Cloudflare tunnel. The bundled JS/CSS are
+# referenced at /assets/*; mounting that here lets relative API calls (/analyze, /extras)
+# Just Work from the same origin. Falls back to the throwaway frontend/index.html when
+# the SPA hasn't been built.
+WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
+if (WEB_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=str(WEB_DIST / "assets")), name="assets")
+
 
 @app.get("/health")
 def health() -> dict:
@@ -116,10 +126,16 @@ def health() -> dict:
 
 @app.get("/")
 def index():
+    # Prefer the built React SPA (Phase 6); fall back to the throwaway proof page.
+    spa = WEB_DIST / "index.html"
+    if spa.exists():
+        return FileResponse(spa)
     idx = FRONTEND_DIR / "index.html"
     if idx.exists():
         return FileResponse(idx)
-    return JSONResponse({"detail": "frontend/index.html not found"}, status_code=404)
+    return JSONResponse(
+        {"detail": "frontend not built — run: cd web && npm run build"}, status_code=404
+    )
 
 
 # Golden, fully-populated Report fixture (signals + graph + risks + attackPath + fixes).
